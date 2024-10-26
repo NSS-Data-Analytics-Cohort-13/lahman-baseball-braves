@@ -116,3 +116,218 @@ order by decade
 
 -- Q.6 Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.
 
+select * from batting
+--select * from teams
+select * from people
+
+---stolen bases for year 2016
+select  sb
+	,	cs
+	,	playerid
+	,	yearid
+from batting
+where sb is not null and cs is not null  and yearid = 2016
+
+
+select sb,cs,playerid from batting where yearid=2016 and (sb+cs) >=20
+order by sb desc,cs desc
+
+
+--success in stealing %
+select  playerid
+	,	sb
+	,	cs
+	,	round((sb*1.0/(sb+cs))*100,2) as per
+from batting
+where yearid =2016 and (sb+cs)>=20
+order by per desc
+
+--name of the player
+select  namefirst
+	,	namelast
+from people
+where playerid ilike 'owingch01'
+
+-- final query
+with players as (
+
+		select  playerid
+			,	sb
+			,	cs
+			,	round((sb*1.0/(sb+cs))*100,2) as sb_percentage
+		from batting
+		where yearid = 2016 
+			  and (sb+cs) >= 20
+		
+)
+select  p1.playerid
+	,	p1.sb
+	,	p1.cs
+	,	p1.sb_percentage
+	,	p2.namefirst
+	,	p2.namelast
+from
+	players p1
+join
+	people p2 using(playerid)
+order by 
+	p1.sb_percentage desc
+limit 1
+
+
+--Q.7 From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+select * from seriespost 
+select * from teams 
+
+--Q1. largest no of win no ws won
+select name
+	,	w 
+	,   yearid
+	,   'largest' as win
+from teams 
+where wswin ilike '%n%' and yearid between 1970 and 2016
+order by w desc
+limit 1
+-- ans -2001 , 116 wins , seattle mariners
+
+-- Q2.smallest no of win yes ws won
+select name
+	,	w 
+	,	yearid
+	,  'smalest' as win
+from teams where wswin ilike '%y%' and yearid between 1970 and 2016
+--ans yearid != 1981  -- exclude year 1981
+order by w
+limit 1  
+-- year 1981 ,63 w , los angeles dodgers
+
+---
+select  yearid ,w ,wswin, name
+from teams 
+where yearid between 1970 and 2016 and yearid != 1981
+
+----
+select  yearid
+	,	max(w) as max_win--,name,w,wswin 
+from teams 
+where yearid between 1970 and 2016 and yearid != 1981 and wswin ilike '%y%'
+group by yearid
+order by max_win 
+-- max_wins 83
+
+--world series win (wswin) yes 1970 -2016
+select  yearid --,wswin,name
+from teams 
+where yearid between 1970 and 2016 and wswin ilike '%y%'
+
+
+
+----Q.3 query to find min and max wins and excluding min win year
+--------  Then redo your query, excluding the problem year.
+with team_wins as(
+		select  
+			max(case when wswin ilike '%n%' then w end) as max_win ,
+			min(case when wswin ilike '%y%' then w end) as min_win 
+			--name
+		from teams
+		where yearid between 1970 and 2016 
+		             and yearid != 1981 --excluding problem year
+					--and yearid not in (select )
+		--group by name
+)
+select 
+	  max_win
+	, min_win
+--	, name
+from team_wins
+
+
+-----------Q.4 query most team wins and world series wins
+--------------How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+with mostwins as(
+		select  
+			yearid ,-- name ,
+			max(w) as max_wins
+		from teams
+		where yearid between 1970 and 2016 
+	    group by yearid --,name    --ans is 47 
+),
+ws_wins as (
+		select yearid
+		from teams
+		where yearid between 1970 and 2016 
+					 and wswin ilike '%y%'	 --- ans 46			
+
+),
+winners as(
+		select yearid
+			,  max(w)
+		from teams
+		where yearid between 1970 and 2016 and wswin ilike '%y%'
+		group by yearid
+		
+		intersect
+		
+		select yearid
+			,  max(w)
+		from teams
+		where yearid between 1970 and 2016 
+		group by yearid
+		order by yearid
+)
+select 
+	  round(count(winners.yearid)/(select count(mostwins.yearid) from mostwins ):: decimal *100,2)
+from winners 
+
+
+--Q.8.Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+select * from homegames
+select * from  parks
+select * from teams
+
+select  team , park ,games
+from homegames 
+where year =2016 and games >=10    --- ans 30 
+
+select count(games) from homegames where year =2016 and games >=10   -- ans 30
+
+
+
+------ Q.1 team and park top 5 avg attendance 
+select  distinct p1.park_name
+	,	t1.name
+	,	h.attendance/h.games as avg_attendance
+from homegames h
+join parks  p1 
+using(park)
+join teams t1
+on h.year = t1.yearid  and h.team = t1.teamid
+where year = 2016 and h.games >=10 --and games is not null
+order by avg_attendance desc  --- ans total  30 rows
+limit 5
+
+
+----- Q.2 lowest 5
+select  distinct p1.park_name
+	,	t1.name
+	,	h.attendance/h.games as avg_attendance
+from homegames h
+join parks  p1 
+using(park)
+join teams t1
+on h.year = t1.yearid  and h.team = t1.teamid
+where year = 2016 and h.games >=10 
+order by avg_attendance   
+limit 5
+
+
+----Q.9.Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+select * from awardsmanagers
+select * from teams
+
+select awardid , lgid
+from awardsmanagers
+where awardid ilike '%tsn manager%' and (lgid = 'NL' or  lgid = 'AL')
+
+

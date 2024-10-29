@@ -123,7 +123,13 @@ WITH winners AS (SELECT yearid, MAX(w) AS most_wins
 						GROUP BY yearid
 						ORDER BY yearid)
 --Following query generates the denominator as 46 excluding the year 1994 when world series championship didn't happen because of player strike.
- SELECT ROUND((COUNT(w.yearid)/(SELECT COUNT(yearid) FROM teams WHERE yearid BETWEEN 1970 and 2016 AND wswin = 'Y')::DECIMAL * 100),2) AS win_ws_percent
+ SELECT 
+  ROUND
+	(
+	   (COUNT(w.yearid)/(SELECT COUNT(yearid) FROM teams 
+	 	WHERE yearid BETWEEN 1970 AND 2016 
+			AND wswin = 'Y')::DECIMAL * 100),2
+	) AS win_ws_percent
  FROM winners AS w
 
 /*Answer: 26.09%*/
@@ -176,24 +182,38 @@ LIMIT 5;
 "Marlins Park"	"Miami Marlins"	21405
 "U.S. Cellular Field"	"Chicago White Sox"	21559*/
 
---9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+--Q9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
--- Below CTE retrieves managers who have won the TSN Manager of the Year award in both NL and AL
-WITH tsn_manager AS
-	(SELECT 
-		p.namefirst || p.namelast AS manager_name
-		, am.playerid AS manager_id
-		, am.awardid, am.yearid
-		, am.lgid, m.teamid
+--Following CTE is generating manager ids who won TSN Manager of the Year award in both NL and AL category.
+WITH al_nl_manager AS
+	(
+		SELECT playerid  
+		FROM AwardsManagers
+		WHERE lgid IN ('AL', 'NL') AND awardid ILIKE '%tsn%'
+		GROUP BY playerid
+		HAVING COUNT(DISTINCT lgid) = 2
+	)
+--Below query is fetching manager name and team names managed by managers generated from CTE
+SELECT 
+		DISTINCT(p.namefirst || p.namelast) AS manager_name
+		, t.name AS team_name
 	FROM AwardsManagers AS am
 		LEFT JOIN people AS p 
-			USING(playerid)
+			USING(playerid )
 		LEFT JOIN managers AS m
-			ON am.playerid = m.playerid AND am.yearid = m.yearid
-	WHERE (am.lgid = 'NL' OR am.lgid = 'AL')
-		AND am.awardid ILIKE '%TSN Manager%')
--- Query to find team names managed by managers who have won the TSN Manager of the Year award in both NL and AL
-SELECT *, t.name AS team_name
-	FROM tsn_manager AS tm
+			on am.playerid = m.playerid AND am.yearid = m.yearid
 		LEFT JOIN teams AS t
-		ON tm.teamid = t.teamid AND tm.yearid = t.yearid
+			ON m.teamid = t.teamid AND am.yearid = t.yearid
+	WHERE am.playerid IN (SELECT playerid FROM al_nl_manager);
+
+/*Answer: "DaveyJohnson"	"Baltimore Orioles"
+"DaveyJohnson"	"Washington Nationals"
+"JimLeyland"	"Detroit Tigers"
+"JimLeyland"	"Pittsburgh Pirates"
+--ADDITIONAL ANALYSIS
+SELECT * FROM awardsmanagers 
+	WHERE playerid IN ('leylaji99','johnsda02') AND awardid ILIKE '%tsn%'
+--Answer : JimLeyland won 3 NL awards and 1 AL award, whereas DaveyJohnson won one each in the years 1997,2012,1988,1990,1992,2006
+*/
+
+--Q10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.

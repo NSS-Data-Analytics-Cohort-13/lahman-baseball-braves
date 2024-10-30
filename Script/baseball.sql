@@ -96,7 +96,7 @@ FROM batting
 LEFT JOIN people
 USING(playerid)
 WHERE yearid = 2016
-and SB >= 20
+and (SB+cs) >= 20
 ORDER BY sb_success_percentage DESC;
 
 
@@ -245,7 +245,83 @@ Select h.team,t.name, p.park_name, (h.attendance/h.games) as avg_atten
 
 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
-select * from awardsmanagers
-SELECT  * from managers
+-- SELECT * from awardsmanagers
+-- SELECT  * from people
+-- SELECT  * from teams
+
+	
+WITH T1 AS (
+Select playerid, yearid, lgid, awardid
+FROM awardsmanagers
+WHERE awardid ILIKE '%TSN%'
+AND lgid in (select lgid from awardsmanagers where lgid in ('AL') )
+),
+	--select * from T1
+
+ T2 AS (
+Select playerid, yearid, lgid, awardid
+FROM awardsmanagers
+WHERE awardid ILIKE '%TSN%'
+AND lgid in (select lgid from awardsmanagers where lgid in ('NL') )
+),
+	
+T3 as
+	(	
+	select t1.playerid, t1.yearid, t2.yearid as year
+	from t1
+	inner join t2
+	on t1.playerid=t2.playerid 
+	)
+	
+
+select distinct p.namefirst, p.namelast, t.name as team_name--, t3.year
+	from T3
+	inner join people as P
+	on T3.playerid = p.playerid 
+	inner join managers as m
+	on t3.playerid=m.playerid 
+	inner join teams as t
+	on m.teamid=t.teamid
+	
+
+	
+	-- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+
+-- SELECT * FROM batting
+-- SELECT * FROM people
+
+
+	
+with T1 as 
+	(
+	select playerid, count(distinct yearid) as num_yr
+	from batting
+	group by playerid
+	having count(distinct yearid)>=10
+	order by num_yr desc
+	)
+
+select p1.namefirst,p1.namelast,b1.hr as hr_high
+	from batting as b1
+	join people p1 
+	on  b1.playerid = p1.playerid
+	inner join t1 
+	on b1.playerid = t1.playerid 
+	where b1.yearid = 2016
+--and extract(year from cast(p1.finalgame AS date)) - extract(year from cast(p1.debut AS date)) >= 10
+and b1.hr >=1
+and b1.hr = (
+       		 select max(hr)
+        	from batting
+        	where playerid = b1.playerid
+    		)
+group by p1.namefirst, p1.namelast,b1.hr
+order by hr_high desc
+
+
+
+
+
 
 		

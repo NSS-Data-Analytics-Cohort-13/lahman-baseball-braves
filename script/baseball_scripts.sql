@@ -325,9 +325,170 @@ limit 5
 ----Q.9.Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 select * from awardsmanagers
 select * from teams
+select playerid,namegiven,namefirst,namelast from people where playerid = 'larusto01'
 
-select awardid , lgid
-from awardsmanagers
-where awardid ilike '%tsn manager%' and (lgid = 'NL' or  lgid = 'AL')
 
+with nl_award as(
+		select playerid
+		from awardsmanagers 
+		where awardid ilike '%tsn manager%' and lgid = 'NL' -- count 30
+),
+al_award as(
+		select playerid
+		from awardsmanagers 
+		where awardid ilike '%tsn manager%' and lgid = 'AL' -- count 30
+),
+
+both_awards as(
+		select playerid
+		from awardsmanagers 
+		where awardid ilike '%tsn manager%' AND lgid = 'NL'
+
+		intersect
+
+		select playerid
+		from awardsmanagers 
+		where awardid ilike '%tsn manager%' AND lgid = 'AL'
+--- leylaji99 - jim leyland  , johnsda02  --davey johnson
+)
+
+select distinct t.name as team_name,p1.namefirst,p1.namelast
+from both_awards as b1
+join people p1 on b1.playerid = p1.playerid
+join managers m on p1.playerid = m.playerid --and b1.yearid=m.yearid
+join teams t on m.teamid = t.teamid and m.yearid = t.yearid
+order by namefirst
+
+
+
+
+----------
+WITH al_nl_manager AS
+	(
+		SELECT playerid
+		FROM AwardsManagers
+		WHERE lgid IN ('AL', 'NL') AND awardid ILIKE '%tsn%'
+		GROUP BY playerid
+		HAVING COUNT(DISTINCT lgid) = 2
+	)
+--Below query is fetching manager name and team names managed by managers generated from CTE
+SELECT
+		DISTINCT(p.namefirst || p.namelast) AS manager_name
+		, t.name AS team_name
+	FROM AwardsManagers AS am
+		LEFT JOIN people AS p
+			USING(playerid )
+		LEFT JOIN managers AS m
+			on am.playerid = m.playerid AND am.yearid = m.yearid
+		LEFT JOIN teams AS t
+			ON m.teamid = t.teamid AND am.yearid = t.yearid
+	WHERE am.playerid IN (SELECT playerid FROM al_nl_manager);
+
+
+
+
+-- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+select * from people
+select * from batting
+
+
+select playerid, hr
+from batting 
+where yearid = 2016 and hr >=1
+
+
+
+select 
+    playerid,extract(year from cast(finalgame AS date)),extract(year from cast(debut AS date)),extract(year from cast(finalgame AS date)) - extract(year from cast(debut AS date)) as years_played
+from 
+    people
+where 
+    extract(year from cast(finalgame AS date)) - extract(year from cast(debut AS date)) >= 10 
+
+order by years_played 
+
+--Query
+/*select p1.namefirst,p1.namelast,b1.hr as hr_high 
+from batting as b1
+join people p1 on  b1.playerid = p1.playerid
+where b1.yearid = 2016 
+and extract(year from cast(p1.finalgame AS date)) - extract(year from cast(p1.debut AS date)) >= 10 
+and b1.hr >=1 
+and b1.hr = (
+        select max(hr) 
+        from batting 
+        where playerid = b1.playerid 
+		
+    )
+group by p1.namefirst,p1.namelast,b1.hr
+order by hr_high desc  */
+
+---correct query
+select p1.namefirst,p1.namelast,b1.hr as hr_high 
+from batting as b1
+join people p1 on  b1.playerid = p1.playerid
+--where b1.yearid = 2016 
+and (select count(distinct yearid) 
+     from batting 
+     where playerid = p1.playerid) >= 10 
+and b1.hr >=1 
+and b1.hr = (
+        select max(hr) 
+        from batting 
+        where playerid = b1.playerid 
+		and  b1.yearid = 2016 
+    )
+group by p1.namefirst,p1.namelast,b1.hr
+order by hr_high desc
+
+
+
+
+--11. Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
+
+select * from  salaries
+select * from  teams
+
+select teamid,count(playerid) as teamcount ,yearid
+from salaries
+where yearid>2000
+group by teamid,yearid
+
+select w,yearid from teams
+where yearid >2000
+
+select sum(salary) as team_sal,yearid,teamid
+from salaries
+where yearid >2000
+group by yearid,teamid    
+
+select  s.yearid ,s.teamid,count(s.playerid) as players_inteam
+	,	sum(s.salary) as team_sal 
+	,	t.w
+from  salaries as s
+right join teams t on s.yearid=t.yearid and s.teamid=t.teamid
+where s.yearid >2000
+group by s.yearid,s.teamid,t.w
+order by teamid 
+
+
+/*--12.In this question, you will explore the connection between number of wins and attendance.
+Does there appear to be any correlation between attendance at home games and number of wins?
+Do teams that win the world series see a boost in attendance the following year? What about teams that made the playoffs? Making the playoffs means either being a division winner or a wild card winner.  */
+
+select * from teams
+select * from homegames
+
+select attendance,teamid,yearid from teams where teamid ='DET' and yearid =1911
+
+select attendance,team,year from homegames where team = 'DET' and year = 1911
+
+
+select t.w,h.attendance
+from teams as t
+join homegames hVankam#374
+
+on t.teamid = h.team
+--group by  t.teamid,t.yearid,t.w,h.attendance 
 

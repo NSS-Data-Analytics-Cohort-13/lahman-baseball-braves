@@ -204,6 +204,7 @@ SELECT
 			on am.playerid = m.playerid AND am.yearid = m.yearid
 		LEFT JOIN teams AS t
 			ON m.teamid = t.teamid AND am.yearid = t.yearid
+-- Following subquery in where clause is making sure the data has been retrieved only for those managers mentioned in CTE-al_nl_manager
 	WHERE am.playerid IN (SELECT playerid FROM al_nl_manager);
 
 /*Answer: "DaveyJohnson"	"Baltimore Orioles"
@@ -216,4 +217,29 @@ SELECT * FROM awardsmanagers
 --Answer : JimLeyland won 3 NL awards and 1 AL award, whereas DaveyJohnson won one each in the years 1997,2012,1988,1990,1992,2006
 */
 
---Q10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+/* Q10. Find all players who hit their career highest number of home runs in 2016. 
+Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. 
+Report the players' first and last names and the number of home runs they hit in 2016.*/
+
+SELECT 
+	p1.namefirst
+	, p1.namelast
+	, b1.hr AS hr_high
+FROM batting AS b1
+	JOIN people p1 ON  b1.playerid = p1.playerid
+--Following subquery is checking a condition, that a player must have played at least for 10 years
+		AND ( SELECT COUNT(DISTINCT yearid) 
+			  FROM batting
+			  WHERE playerid =p1.playerid
+			 )>=10
+		AND b1.hr >=1
+--following subquery making sure, that a player has scored his highest number of home runs in the year 2016
+		AND b1.hr = ( SELECT MAX(hr)
+					  FROM batting
+					  WHERE playerid = b1.playerid
+						AND b1.yearid = 2016
+	    			)
+GROUP BY p1.namefirst,p1.namelast,b1.hr
+ORDER BY hr_high DESC
+
+/*Answer: This will return back 9 rows in total*/

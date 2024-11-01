@@ -89,30 +89,26 @@ SELECT (yearid/10)*10 AS decade,
 	GROUP BY decade
 	ORDER BY decade
 
-6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+-- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
 	
-SELECT playerid, namefirst, namelast, cs, sb, (cs+sb) as attempts, ROUND((sb::decimal/(cs::decimal+sb::decimal))*100, 2) as sb_success_percentage
+SELECT playerid
+	, namefirst
+	, namelast, sum(cs) as stolen_caught, sum(sb) as stolen_base
+	, (sum(cs) +sum(sb)) as attempts
+	, ROUND((sum(sb::decimal)/sum((cs::decimal+sb::decimal)))*100, 2) as sb_success_percentage
+
 FROM batting
 LEFT JOIN people
 USING(playerid)
 WHERE yearid = 2016
-and (SB+cs) >= 20
+group by playerid, namefirst, namelast
+having (sum(SB)+ sum(cs)) >= 20
 ORDER BY sb_success_percentage DESC;
 
 
----USING FILDING TABLE----
-
--- SELECT playerid, namefirst, namelast, cs, sb, cs+sb as attempts
--- 	, ROUND((sb::float/(cs::float+sb::float))::numeric, 2)*100 as sb_success_percentage
--- FROM fielding
--- LEFT JOIN people
--- USING(playerid)
--- WHERE yearid = 2016
--- AND sb >= 20
--- ORDER BY sb_success_percentage DESC;
 
 
-7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+-- 7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
 --largest number of win that did not win the world series---
 	
@@ -216,7 +212,7 @@ AND t.yearid BETWEEN 1970 AND 2016;
 -- select * from final
 
 
-8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 mgaes played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+-- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 mgaes played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 
 		
 		Select h.team,t.name, p.park_name, (h.attendance/h.games) as avg_atten  
@@ -243,7 +239,7 @@ Select h.team,t.name, p.park_name, (h.attendance/h.games) as avg_atten
 
 
 
-9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+-- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
 -- SELECT * from awardsmanagers
 -- SELECT  * from people
@@ -272,9 +268,7 @@ T3 as
 	inner join t2
 	on t1.playerid=t2.playerid 
 	)
-	
-
-select distinct p.namefirst, p.namelast, t.name as team_name--, t3.year
+	select distinct p.namefirst, p.namelast, t.name as team_name--, t3.year
 	from T3
 	inner join people as P
 	on T3.playerid = p.playerid 
@@ -283,8 +277,59 @@ select distinct p.namefirst, p.namelast, t.name as team_name--, t3.year
 	inner join teams as t
 	on m.teamid=t.teamid
 	
+---Alternatively ------
 
+	WITH nl_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'NL'
+),
+al_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'AL'
+),
+both_awards AS (
+    SELECT nl.playerid
+    FROM nl_award nl
+    JOIN al_award al ON nl.playerid = al.playerid
+)
+SELECT DISTINCT
+    (p.namefirst || ' ' || p.namelast) AS manager_name,
+    t.name AS team_name
+FROM
+    AwardsManagers am
+JOIN
+    both_awards ba ON am.playerid = ba.playerid
+JOIN
+    people p ON am.playerid = p.playerid
+JOIN
+    managers m ON am.playerid = m.playerid AND am.yearid = m.yearid
+JOIN
+    teams t ON m.teamid = t.teamid AND am.yearid = t.yearid
+ORDER BY
+    manager_name;
+
+
+---alternative approach---
+
+WITH manager_both AS (SELECT playerid, al.lgid AS al_lg, nl.lgid AS nl_lg,
+					  al.yearid AS al_year, nl.yearid AS nl_year,
+					  al.awardid AS al_award, nl.awardid AS nl_award
+	FROM awardsmanagers AS al INNER JOIN awardsmanagers AS nl
+	USING(playerid)
+	WHERE al.awardid LIKE 'TSN%'
+	AND nl.awardid LIKE 'TSN%'
+	AND al.lgid LIKE 'AL'
+	AND nl.lgid LIKE 'NL')
 	
+SELECT DISTINCT(people.playerid), namefirst, namelast, managers.teamid,
+		managers.yearid AS year, managers.lgid
+FROM manager_both AS mb LEFT JOIN people USING(playerid)
+LEFT JOIN salaries USING(playerid)
+LEFT JOIN managers USING(playerid)
+WHERE managers.yearid = al_year OR managers.yearid = nl_year;
+
 	-- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
 
 
@@ -320,8 +365,6 @@ group by p1.namefirst, p1.namelast,b1.hr
 order by hr_high desc
 
 
+11. Is there any correlation between number of wins and team salary? Use data from 2000 and later to answer this question. As you do this analysis, keep in mind that salaries across the whole league tend to increase together, so you may want to look on a year-by-year basis.
 
 
-
-
-		

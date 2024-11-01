@@ -34,28 +34,31 @@ al_award as(
 		where awardid ilike '%tsn manager%' and lgid = 'AL' -- count 30
 ),
 both_awards as(
-		 select distinct nl.playerid --, nl.yearid as nl_year, al.yearid as al_year
+		 select distinct nl.playerid , nl.yearid as nl_year, al.yearid as al_year
     from nl_award nl
     join al_award al on nl.playerid = al.playerid
 )
 --select * from both_awards
-/*-- display year and names
+-- display year and names
+/*
 select p.playerid, p.namefirst, p.namelast, ba.nl_year, ba.al_year
 from both_awards ba
 join people p on ba.playerid = p.playerid; */
 
-/*select distinct ba.nl_year, p.namefirst, p.namelast, t.name AS team_name
+/*
+select  ba.nl_year, p.namefirst, p.namelast, t.name AS team_name
 from both_awards ba
 join people p on ba.playerid = p.playerid
 join managers m on p.playerid = m.playerid
 join teams t on m.teamid = t.teamid
-order by ba.nl_year, p.namefirst, p.namelast*/
-
+order by ba.nl_year, p.namefirst, p.namelast
+*/
 select  p.namefirst, p.namelast, t.name as team_name
 from both_awards ba
 join people p on ba.playerid = p.playerid
-join managers m on p.playerid = m.playerid --and ba.yearid = m.yearid
+join managers m on p.playerid = m.playerid and ba.yearid = m.yearid
 join teams t on m.teamid = t.teamid and m.yearid = t.yearid
+
 order by p.namefirst, p.namelast
 
 
@@ -63,18 +66,7 @@ order by p.namefirst, p.namelast
 
 
 
-both_award as(
-select nl_award.playerid from nl_award
-intersect
-select al_award.playerid from al_award
 
-)
-select --distinct b1.*, 
-p1.namefirst,p1.namelast,t1.name
-from both_award as b1
-join people p1 on b1.playerid = p1.playerid
-join managers m1 on  p1.playerid = m1.playerid
-join teams t1 on m1.teamid = t1.teamid
 
 
 

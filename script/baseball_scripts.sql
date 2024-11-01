@@ -117,8 +117,9 @@ order by decade
 -- Q.6 Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.
 
 select * from batting
---select * from teams
+select * from teams
 select * from people
+select * from battingpost 
 
 ---stolen bases for year 2016
 select  sb
@@ -152,27 +153,48 @@ where playerid ilike 'owingch01'
 with players as (
 
 		select  playerid
-			,	sb
-			,	cs
-			,	round((sb*1.0/(sb+cs))*100,2) as sb_percentage
+			,	sum(sb) stolen_base
+			,	sum(cs) caught_stealing
+			,	sum(sb)+sum(cs) attempted_steals
+			,	round((sum(sb)*1.0/(sum(sb)+sum(cs)))*100,2) as sb_percentage
 		from batting
-		where yearid = 2016 
-			  and (sb+cs) >= 20
+		where yearid = 2016
+		group by playerid 
+--			  and (sb+cs) >= 20
 		
 )
 select  p1.playerid
-	,	p1.sb
-	,	p1.cs
+	,	p1.stolen_base
+	,	p1.caught_stealing
 	,	p1.sb_percentage
 	,	p2.namefirst
 	,	p2.namelast
 from
 	players p1
 join
-	people p2 using(playerid)
+	people p2 on p1.playerid = p2.playerid 
+
+group by p1.playerid,p2.namefirst,p2.namelast,p1.stolen_base,p1.caught_stealing,p1.sb_percentage,attempted_steals
+having attempted_steals >=20
 order by 
 	p1.sb_percentage desc
 limit 1
+
+--- method -2
+select  p.playerid
+	,	p.namefirst
+	,	p.namelast
+	,	sum(sb) stolenbase
+	,	sum(cs) caught_stealing
+	,	sum(sb)+sum(cs) attempted
+	,	round(sum(sb::numeric)*100/(sum(sb::numeric)+sum(cs::numeric)),2) as percentage
+from  batting as b
+join people p
+on b.playerid = p.playerid
+and yearid = 2016
+group by 1,2,3
+having sum(sb)+sum(cs) >=20
+order by percentage desc
 
 
 --Q.7 From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
@@ -196,36 +218,41 @@ select name
 	,	yearid
 	,  'smalest' as win
 from teams where wswin ilike '%y%' and yearid between 1970 and 2016
---ans yearid != 1981  -- exclude year 1981
 order by w
 limit 1  
 -- year 1981 ,63 w , los angeles dodgers
 
----
-select  yearid ,w ,wswin, name
-from teams 
-where yearid between 1970 and 2016 and yearid != 1981
+-- Q3
+select name
+	,	w 
+	,	yearid
+	,  'smalest' as win
+from teams where wswin ilike '%y%' and yearid between 1970 and 2016
+and yearid != 1981  -- exclude year 1981
+order by w
+limit 1
+-- ans St.Louis Cardinals , 83, 2006
 
-----
-select  yearid
-	,	max(w) as max_win--,name,w,wswin 
-from teams 
-where yearid between 1970 and 2016 and yearid != 1981 and wswin ilike '%y%'
-group by yearid
-order by max_win 
--- max_wins 83
+-- ----
+-- select  yearid
+-- 	,	max(w) as max_win--,name,w,wswin 
+-- from teams 
+-- where yearid between 1970 and 2016 and yearid != 1981 and wswin ilike '%y%'
+-- group by yearid
+-- order by max_win 
+-- -- max_wins 83
 
---world series win (wswin) yes 1970 -2016
-select  yearid --,wswin,name
-from teams 
-where yearid between 1970 and 2016 and wswin ilike '%y%'
+-- --world series win (wswin) yes 1970 -2016
+-- select  yearid --,wswin,name
+-- from teams 
+-- where yearid between 1970 and 2016 and wswin ilike '%y%'
 
 
 
 ----Q.3 query to find min and max wins and excluding min win year
 --------  Then redo your query, excluding the problem year.
 with team_wins as(
-		select  
+		select 
 			max(case when wswin ilike '%n%' then w end) as max_win ,
 			min(case when wswin ilike '%y%' then w end) as min_win 
 			--name
@@ -233,12 +260,12 @@ with team_wins as(
 		where yearid between 1970 and 2016 
 		             and yearid != 1981 --excluding problem year
 					--and yearid not in (select )
-		--group by name
+
 )
 select 
 	  max_win
 	, min_win
---	, name
+
 from team_wins
 
 
@@ -327,42 +354,41 @@ select * from awardsmanagers
 select * from teams
 select playerid,namegiven,namefirst,namelast from people where playerid = 'larusto01'
 
-
-with nl_award as(
-		select playerid
-		from awardsmanagers 
-		where awardid ilike '%tsn manager%' and lgid = 'NL' -- count 30
+--method 1
+WITH nl_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers 
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'NL'
 ),
-al_award as(
-		select playerid
-		from awardsmanagers 
-		where awardid ilike '%tsn manager%' and lgid = 'AL' -- count 30
+al_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers 
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'AL'
 ),
-
-both_awards as(
-		select playerid
-		from awardsmanagers 
-		where awardid ilike '%tsn manager%' AND lgid = 'NL'
-
-		intersect
-
-		select playerid
-		from awardsmanagers 
-		where awardid ilike '%tsn manager%' AND lgid = 'AL'
---- leylaji99 - jim leyland  , johnsda02  --davey johnson
+both_awards AS (
+    SELECT nl.playerid
+    FROM nl_award nl
+    JOIN al_award al ON nl.playerid = al.playerid
 )
 
-select distinct t.name as team_name,p1.namefirst,p1.namelast
-from both_awards as b1
-join people p1 on b1.playerid = p1.playerid
-join managers m on p1.playerid = m.playerid --and b1.yearid=m.yearid
-join teams t on m.teamid = t.teamid and m.yearid = t.yearid
-order by namefirst
+SELECT DISTINCT 
+    (p.namefirst || ' ' || p.namelast) AS manager_name,
+    t.name AS team_name
+FROM 
+    AwardsManagers am
+JOIN 
+    both_awards ba ON am.playerid = ba.playerid
+JOIN 
+    people p ON am.playerid = p.playerid
+JOIN 
+    managers m ON am.playerid = m.playerid AND am.yearid = m.yearid
+JOIN 
+    teams t ON m.teamid = t.teamid AND am.yearid = t.yearid
+ORDER BY 
+    manager_name;
 
 
-
-
-----------
+---------- 2nd method
 WITH al_nl_manager AS
 	(
 		SELECT playerid

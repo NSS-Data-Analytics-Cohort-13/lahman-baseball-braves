@@ -130,6 +130,27 @@ ORDER BY decade
 	  -- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
 
 
+
+
+SELECT 
+      batting.playerid,
+	  people.namefirst,
+	  people.namelast,
+	  SUM(sb) stolen_base,
+	  SUM(cs) AS caught_stealing,
+	  SUM(sb)+SUM(cs) AS tried_steals,
+	  ROUND(SUM(sb::numeric) / (SUM(sb::numeric) +SUM(cs::numeric))*100,2) AS percentage
+	  FROM batting 
+	  JOIN people 
+	  On batting.playerid = people.playerid
+	  AND yearid =2016
+	  
+      GROUP BY batting.playerid,people.namefirst,people.namelast
+	  Having SUM(sb)+SUM(cs)>= 20
+	  ORDER BY percentage DESC;
+	  
+ANSWER run the query to get 50 rows 
+	  
 	  SELECT 
     people.playerid,
     people.namefirst,
@@ -147,16 +168,16 @@ ORDER BY
 -- LIMIT 1;
 
 -- ANSWER : josmil sb20 and cs 0 
-OTher way of doing it 
+-- OTher way of doing it 
 
-select sb,cs, b.playerid, round(cast(sb as numeric)/(sb+cs) * 100,2) || '%' as success_rate,
-		p.namefirst, p.namelast
-from batting AS b
-	INNER JOIN people AS p
-	USING (playerid)--ON b.playerid = p.playerid
-where yearid = '2016' and sb <> 0 and cs <> 0
-		and (sb + cs) >= 20
-order by success_rate desc
+-- select sb,cs, b.playerid, round(cast(sb as numeric)/(sb+cs) * 100,2) || '%' as success_rate,
+-- 		p.namefirst, p.namelast
+-- from batting AS b
+-- 	INNER JOIN people AS p
+-- 	USING (playerid)--ON b.playerid = p.playerid
+-- where yearid = '2016' and sb <> 0 and cs <> 0
+-- 		and (sb + cs) >= 20
+-- order by success_rate desc
 
 7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
@@ -167,7 +188,8 @@ FROM teams
 WHERE WSWin = 'N' AND yearid BETWEEN 1970 AND 2016
 
 GROUP BY name,yearid 
-ORDER BY max_wins_non_champion DESC;
+ORDER BY max_wins_non_champion DESC
+Limit 1;
 
 SELECT MAX(W) AS max_wins_non_champion
 FROM teams
@@ -203,6 +225,7 @@ FROM (
     AND yearid BETWEEN 1970 AND 2016
 ) AS champion_most_wins;
   -- ANSWWER run the query for the final answers
+  There is a protest in the middle of the series and but still the season happend as the question is in parts please do run the different parts 
 
 
   -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
@@ -236,32 +259,70 @@ LIMIT 5;
 
 -- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
- WITH t1 AS(
- SELECT playerid,yearid,lgid,awardid
- FROM awardsmanagers
- WHERE awardid ILIKE '%TSN%'
- AND lgid IN (SELECT lgid FROM awardsmanagers WHERE lgid IN ('AL'))
- ),
+ -- WITH t1 AS(
+ -- SELECT playerid,yearid,lgid,awardid
+ -- FROM awardsmanagers
+ -- WHERE awardid ILIKE '%TSN%'
+ -- AND lgid IN (SELECT lgid FROM awardsmanagers WHERE lgid IN ('AL'))
+ -- ),
 
- t2 AS(
- SELECT playerid,yearid,lgid,awardid
- FROM awardsmanagers
- WHERE awardid ILIKE '%TSN%'
- AND lgid IN (SELECT lgid FROM awardsmanagers WHERE lgid IN ('NL'))
- ),
- T3 AS( SELECT t1.playerid,t1.yearid,t2.yearid
- FROM t1
- INNER JOIN t2
- ON t1.playerid = t2.playerid)
+ -- t2 AS(
+ -- SELECT playerid,yearid,lgid,awardid
+ -- FROM awardsmanagers
+ -- WHERE awardid ILIKE '%TSN%'
+ -- AND lgid IN (SELECT lgid FROM awardsmanagers WHERE lgid IN ('NL'))
+ -- ),
+ -- T3 AS( SELECT t1.playerid,t1.yearid,t2.yearid
+ -- FROM t1
+ -- INNER JOIN t2
+ -- ON t1.playerid = t2.playerid)
  
- SELECT DISTINCT p.namefirst,p.namelast,t.name AS team_name
- FROM t3 
- JOIN people AS p
- On t3.playerid = p.playerid
- INNER JOIN managers AS m 
- ON t3.playerid = m.playerid AND 
- INNER JOIN teams AS t
-  ON m.teamid = t.teamid
+ -- SELECT DISTINCT p.namefirst,p.namelast,t.name AS team_name
+ -- FROM t3 
+ -- JOIN people AS p
+ -- On t3.playerid = p.playerid
+ -- INNER JOIN managers AS m 
+ -- ON t3.playerid = m.playerid AND 
+ -- INNER JOIN teams AS t
+ --  ON m.teamid = t.teamid
+
+
+ 
+WITH nl_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'NL'
+),
+al_award AS (
+    SELECT playerid, yearid
+    FROM AwardsManagers
+    WHERE awardid ILIKE '%tsn manager%' AND lgid = 'AL'
+),
+both_awards AS (
+    SELECT nl.playerid
+    FROM nl_award nl
+    JOIN al_award al ON nl.playerid = al.playerid
+)
+SELECT DISTINCT
+    (p.namefirst || ' ' || p.namelast) AS manager_name,
+    t.name AS team_name
+FROM
+    AwardsManagers am
+JOIN
+    both_awards ba ON am.playerid = ba.playerid
+JOIN
+    people p ON am.playerid = p.playerid
+JOIN
+    managers m ON am.playerid = m.playerid AND am.yearid = m.yearid
+JOIN
+    teams t ON m.teamid = t.teamid AND am.yearid = t.yearid
+ORDER BY
+    manager_name;
+
+
+
+
+
 
   -- Run the query to get the answer 
 
